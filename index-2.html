@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+</head>
+
+<body>
+    <div style="display:flex;">
+        <div id="calculator" style="width: 900px; height: 700px;"></div>
+        <div id="insert">
+            <h2 style="margin-left: 10px;">Puntos Insertados: </h2>
+            <ul id="lista_insertados">
+                <!-- <li style="font-size:20px;">Hola</lit> -->
+            </ul>
+        </div>
+        <form id="insert_form">
+            X: <input id="insert_form_x" type="number"> <br>
+            Y: <input id="insert_form_y" type="number"> <br>
+            <input type="submit">
+        </form> 
+
+
+    </div>
+</body>
+<script src="https://www.desmos.com/api/v1.7/calculator.js?apiKey=dcb31709b452b1cf9dc26972add0fda6"></script>
+<script>
+    // Init gui
+    let length = 100;
+    let elt = document.getElementById('calculator');
+    let calculator = Desmos.GraphingCalculator(elt, { expressions: false, zoomButtons: false, settingsMenu: false,showGrid: false, showXAxis:false, showYAxis:false,lockViewport:true,xAxisNumbers:false,yAxisNumbers:false});
+    let string_punto = "punto_"
+    let string_tabla = "tabla_"
+
+    // Utility functs
+    calculator.setMathBounds({
+        left: -length,
+        right: length,
+        bottom: -length,
+        top: length
+    });
+
+    // Point class
+    function Point( _x,  _y){
+        this.x = _x;
+        this.y = _y; 
+
+        this.display = () => {
+            return `(${this.x},${this.y})`
+        }
+
+        this.igual = function (otro){
+            return otro.x === this.x && otro.y === this.y
+        }
+
+    }
+
+    // QTree Node class
+    function Node_qtree(punto){
+        this.coord = punto
+        this.parent = null
+        this.hijos = [null,null,null,null]
+
+        this.isLeaf= ()=>{
+            let cuenta = 0            
+            for(let i = 0; i < 4; i++){
+                if(this.hijos[i] === null)
+                    cuenta++
+            }
+            return cuenta === 4;
+        }
+
+        this.getSelfTree = () => {
+            let selfTree = [this.coord]
+            for(let i = 0; i < 4;++i){
+                if(this.hijos[i] !== null){
+                    selfTree = selfTree.concat(this.hijos[i].getSelfTree())
+                }
+            }
+            return selfTree
+        }
+    }
+
+    // QTree class
+    function Qtree(){
+        this.root = null
+        this.ids = 0
+
+        this.getChildIndex = (node,p)=>{
+            if(p.x >= node.coord.x && p.y >= node.coord.y) return 0
+            else if(p.x < node.coord.x && p.y >= node.coord.y) return 1 
+            else if(p.x < node.coord.x && p.y < node.coord.y) return 2
+            else if(p.x >= node.coord.x && p.y < node.coord.y) return 3
+        }
+
+        this.insert = (p)=>{
+            let bound_left = -length;
+            let bound_right = length;
+            let bound_top = length;
+            let bound_bottom = -length;
+            if(this.root === null){
+                this.root = new Node_qtree(p)
+                calculator.setExpression({type:'table',columns:[{
+                    latex:'x',
+                    values:[bound_left,bound_right]//[bound_left,bound_right,this.root.coord.x,this.root.coord.x]
+                },{
+                    latex:'y',
+                    values:[this.root.coord.y,this.root.coord.y],//[this.root.coord.y,this.root.coord.y,bound_bottom,bound_top]
+                    lines:true,
+                    points:false,
+                    color:"#2d70b3"
+
+                }
+                ]})
+                calculator.setExpression({type:'table',columns:[{
+                    latex:'x',
+                    values:[this.root.coord.x,this.root.coord.x]//[bound_left,bound_right,this.root.coord.x,this.root.coord.x]
+                },{
+                    latex:'y',
+                    values:[bound_bottom,bound_top],//[this.root.coord.y,this.root.coord.y,bound_bottom,bound_top]
+                    lines:true,
+                    points:false,
+                    color:"#2d70b3"
+
+                }
+                ]})
+                // this.ids++;
+            }
+            let node = this.root;
+
+            let lado = this.getChildIndex(node,p)
+            if(lado === 0){
+                bound_left = node.coord.x
+                bound_bottom = node.coord.y
+            }else if(lado === 1){
+                    bound_right = node.coord.x
+                    bound_bottom = node.coord.y
+            }else if(lado === 2){
+                bound_right = node.coord.x
+                bound_top = node.coord.y
+            }else if(lado === 3){
+                bound_top = node.coord.y
+                bound_left = node.coord.x
+            }
+
+            while(node.hijos[this.getChildIndex(node,p)] !== null){
+                lado = this.getChildIndex(node,p)
+
+                if(lado === 0){
+                    bound_left = node.coord.x
+                    bound_bottom = node.coord.y
+                }else if(lado === 1){
+                        bound_right = node.coord.x
+                        bound_bottom = node.coord.y
+                }else if(lado === 2){
+                    bound_right = node.coord.x
+                    bound_top = node.coord.y
+                }else if(lado === 3){
+                    bound_top = node.coord.y
+                    bound_left = node.coord.x
+                }
+                node = node.hijos[lado]
+            }
+
+            node.hijos[this.getChildIndex(node,p)] = new Node_qtree(p);
+            calculator.setExpression({type:'table',columns:[{
+                    latex:'x',
+                    values:[bound_left,bound_right]//[bound_left,bound_right,this.root.coord.x,this.root.coord.x]
+                },{
+                    latex:'y',
+                    values:[node.coord.y,node.coord.y],//[this.root.coord.y,this.root.coord.y,bound_bottom,bound_top]
+                    lines:true,
+                    points:false,
+                    color:"#2d70b3"
+
+                }
+                ]})
+                calculator.setExpression({type:'table',columns:[{
+                    latex:'x',
+                    values:[node.coord.x,node.coord.x]//[bound_left,bound_right,this.root.coord.x,this.root.coord.x]
+                },{
+                    latex:'y',
+                    values:[bound_bottom,bound_top],//[this.root.coord.y,this.root.coord.y,bound_bottom,bound_top]
+                    lines:true,
+                    points:false,
+                    color:"#2d70b3"
+
+                }
+                ]})
+        }
+
+        function disp(nodo,prefix,dir)  {
+            if(nodo === null){
+                console.log(prefix,dir,": null")
+                return;
+            }
+            console.log(prefix,dir,": ", nodo.coord.display())
+            direcciones =  ["NE","NW","SW","SE"]
+            for(let i = 0; i < 4; ++i){
+                disp(nodo.hijos[i],prefix + '\t',direcciones[i])
+            }
+
+        }
+
+        this.display = () => {
+            disp(this.root,"","ROOT")
+        }
+
+        this.search_node = (point) => {
+            let node = this.root
+            let parent = null
+
+            while(node !== null && !node.coord.igual(point)){
+                parent = node
+                node = node.hijos[this.getChildIndex(node,point)]
+            }
+
+            return [node,parent]
+        }
+
+        this.remove = (point) => {
+            let [node,parent] = this.search_node(point)
+
+            if(node === null){
+                return
+            }else{
+                let subtree = node.getSelfTree()
+                if(parent !== null){
+                    parent.hijos[this.getChildIndex(parent,point)] = null
+                }
+                else {
+                    this.root = null
+                }
+
+                for(let i = 1; i < subtree.length; ++i){
+                    this.insert(subtree[i])
+                }
+
+            }
+
+        }
+    }
+    
+    // Handle input to GUI
+    let arreglo_x  = []
+    let arreglo_y  = []
+    let quadsito = new Qtree();
+
+    function actualizarPuntos(puntos_x,puntos_y) {
+        calculator.setExpression({
+        type: 'table', id: 'puntos_qtree', columns: [
+            {
+                latex: 'x',
+                values: puntos_x 
+            }, {
+                latex: 'y',
+                values: puntos_y,
+            }
+        ],
+        });
+    }
+
+    function insert_GUI(x, y){
+        arreglo_x.push(x)
+        arreglo_y.push(y)
+        let nuevo_elemento = document.createElement('li')
+        nuevo_elemento.innerHTML = "(" + x + "," + y + ")";
+        document.getElementById("lista_insertados").appendChild(nuevo_elemento)
+        actualizarPuntos(arreglo_x,arreglo_y)
+        quadsito.insert(new Point(x,y));
+    }
+
+    elt.onclick = (event) => {
+        let bounds = elt.getBoundingClientRect()
+        let empieza_x = bounds.left;
+        let empieza_y = bounds.top;
+        let { x, y } = calculator.pixelsToMath({
+            x: event.clientX - empieza_x,
+            y: event.clientY - empieza_y
+        })
+        x = x.toPrecision(3);
+        y = y.toPrecision(3);
+        insert_GUI(x,y);
+    }
+
+    let insert_form = document.getElementById('insert_form');
+    insert_form.onsubmit = (event) => {
+        event.preventDefault()
+        let x = document.getElementById('insert_form_x').value;
+        let y = document.getElementById('insert_form_y').value;
+        insert_GUI(x,y);
+    }
+
+</script>
+
+</html>
